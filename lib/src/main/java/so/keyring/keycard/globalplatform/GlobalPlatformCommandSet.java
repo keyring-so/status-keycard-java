@@ -158,10 +158,6 @@ public class GlobalPlatformCommandSet {
     random.nextBytes(hostChallenge);
     initializeUpdate(hostChallenge).checkOK();
     externalAuthenticate(hostChallenge).checkOK();
-
-    if (this.session.usesFallbackKeys() && autoUpgradeKeys) {
-      this.putSCP02Keys(this.cardKeys.getEncKeyData(), this.cardKeys.getMacKeyData(), this.cardKeys.getDekKeyData(), 0, 1).checkOK();
-    }
   }
 
   /**
