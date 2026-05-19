@@ -4,6 +4,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
+import so.keyring.keycard.globalplatform.Crypto;
+
 public class Mnemonic {
   private final static int WORDLIST_SIZE = 2048;
 
@@ -120,7 +122,7 @@ public class Mnemonic {
     SecretKey key;
 
     try {
-      SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512", "BC");
+      SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512", Crypto.PROVIDER_NAME);
       PBEKeySpec spec = new PBEKeySpec(mnemonicPhrase.toCharArray(), ("mnemonic" + password).getBytes(), 2048, 512);
       key = skf.generateSecret(spec);
     } catch (Exception e) {

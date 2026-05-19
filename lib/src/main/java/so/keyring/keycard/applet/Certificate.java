@@ -17,6 +17,8 @@ import org.bouncycastle.jce.spec.ECParameterSpec;
 import org.bouncycastle.jce.spec.ECPublicKeySpec;
 import org.bouncycastle.util.Arrays;
 
+import so.keyring.keycard.globalplatform.Crypto;
+
 public class Certificate extends RecoverableSignature {
   public static final byte TLV_CERT = (byte) 0x8A;
 
@@ -29,7 +31,7 @@ public class Certificate extends RecoverableSignature {
 
   public static KeyPair generateIdentKeyPair() {
     try {
-      KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("ECDSA", "BC");
+      KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("ECDSA", Crypto.PROVIDER_NAME);
       ECGenParameterSpec spec = new ECGenParameterSpec("secp256k1");
       keyPairGenerator.initialize(spec, new SecureRandom());
       return keyPairGenerator.generateKeyPair();
@@ -42,10 +44,10 @@ public class Certificate extends RecoverableSignature {
     try {
       byte[] pub = ((ECPublicKey) identKeys.getPublic()).getQ().getEncoded(true);
 
-      MessageDigest md = MessageDigest.getInstance("SHA256", "BC");
+      MessageDigest md = MessageDigest.getInstance("SHA256", Crypto.PROVIDER_NAME);
       byte[] hash = md.digest(pub);
 
-      Signature signer = Signature.getInstance("NONEwithECDSA", "BC");
+      Signature signer = Signature.getInstance("NONEwithECDSA", Crypto.PROVIDER_NAME);
       signer.initSign(caPair.getPrivate());
       signer.update(hash);
       byte[] sig = signer.sign();
@@ -78,7 +80,7 @@ public class Certificate extends RecoverableSignature {
       byte[] s = Arrays.copyOfRange(certData, 65, 97);
       int recId = certData[97];
 
-      MessageDigest md = MessageDigest.getInstance("SHA256", "BC");
+      MessageDigest md = MessageDigest.getInstance("SHA256", Crypto.PROVIDER_NAME);
       byte[] hash = md.digest(pub);
       byte[] caPub = recoverFromSignature(recId, hash, r, s, true);
 
@@ -100,11 +102,11 @@ public class Certificate extends RecoverableSignature {
       byte[] certData = tlv.readPrimitive(TLV_CERT);
       Certificate cert = fromTLV(certData);
       byte[] signature = tlv.peekUnread();
-      Signature verifier = Signature.getInstance("NONEWithECDSA", "BC");
+      Signature verifier = Signature.getInstance("NONEWithECDSA", Crypto.PROVIDER_NAME);
 
       ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
       ECPublicKeySpec cardKeySpec = new ECPublicKeySpec(ecSpec.getCurve().decodePoint(cert.identPub), ecSpec);
-      ECPublicKey cardKey = (ECPublicKey) KeyFactory.getInstance("ECDSA", "BC").generatePublic(cardKeySpec);
+      ECPublicKey cardKey = (ECPublicKey) KeyFactory.getInstance("ECDSA", Crypto.PROVIDER_NAME).generatePublic(cardKeySpec);
 
       verifier.initVerify(cardKey);
       verifier.update(hash);

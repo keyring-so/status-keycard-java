@@ -21,6 +21,7 @@ import org.bouncycastle.jce.interfaces.ECPublicKey;
 import org.bouncycastle.jce.spec.ECParameterSpec;
 import org.bouncycastle.jce.spec.ECPublicKeySpec;
 
+import so.keyring.keycard.globalplatform.Crypto;
 import so.keyring.keycard.io.APDUCommand;
 import so.keyring.keycard.io.APDUException;
 import so.keyring.keycard.io.APDUResponse;
@@ -74,17 +75,17 @@ public class SecureChannelSession {
   public void generateSecret(byte[] keyData) {
     try {
       ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
-      KeyPairGenerator g = KeyPairGenerator.getInstance("ECDH", "BC");
+      KeyPairGenerator g = KeyPairGenerator.getInstance("ECDH", Crypto.PROVIDER_NAME);
       g.initialize(ecSpec, random);
 
       KeyPair keyPair = g.generateKeyPair();
 
       publicKey = ((ECPublicKey) keyPair.getPublic()).getQ().getEncoded(false);
-      KeyAgreement keyAgreement = KeyAgreement.getInstance("ECDH", "BC");
+      KeyAgreement keyAgreement = KeyAgreement.getInstance("ECDH", Crypto.PROVIDER_NAME);
       keyAgreement.init(keyPair.getPrivate());
 
       ECPublicKeySpec cardKeySpec = new ECPublicKeySpec(ecSpec.getCurve().decodePoint(keyData), ecSpec);
-      ECPublicKey cardKey = (ECPublicKey) KeyFactory.getInstance("ECDSA", "BC").generatePublic(cardKeySpec);
+      ECPublicKey cardKey = (ECPublicKey) KeyFactory.getInstance("ECDSA", Crypto.PROVIDER_NAME).generatePublic(cardKeySpec);
 
       keyAgreement.doPhase(cardKey, true);
       secret = keyAgreement.generateSecret();
@@ -150,7 +151,7 @@ public class SecureChannelSession {
 
       sessionEncKey = new SecretKeySpec(Arrays.copyOf(keyData, SC_SECRET_LENGTH), "AES");
       sessionMacKey = new KeyParameter(keyData, SC_SECRET_LENGTH, SC_SECRET_LENGTH);
-      sessionCipher = Cipher.getInstance("AES/CBC/ISO7816-4Padding", "BC");
+      sessionCipher = Cipher.getInstance("AES/CBC/ISO7816-4Padding", Crypto.PROVIDER_NAME);
       sessionMac = new CBCBlockCipherMac(new AESEngine(), 128, null);
       open = true;
     } catch(Exception e) {
@@ -189,7 +190,7 @@ public class SecureChannelSession {
     MessageDigest md;
 
     try {
-      md = MessageDigest.getInstance("SHA256", "BC");
+      md = MessageDigest.getInstance("SHA256", Crypto.PROVIDER_NAME);
     } catch(Exception e) {
       throw new RuntimeException("Is BouncyCastle in the classpath?", e);
     }
@@ -424,7 +425,7 @@ public class SecureChannelSession {
       random.nextBytes(iv);
       IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
       sessionEncKey = new SecretKeySpec(secret, "AES");
-      sessionCipher = Cipher.getInstance("AES/CBC/ISO7816-4Padding", "BC");
+      sessionCipher = Cipher.getInstance("AES/CBC/ISO7816-4Padding", Crypto.PROVIDER_NAME);
       sessionCipher.init(Cipher.ENCRYPT_MODE, sessionEncKey, ivParameterSpec);
       initData = sessionCipher.doFinal(initData);
       byte[] encrypted = new byte[1 + publicKey.length + iv.length + initData.length];

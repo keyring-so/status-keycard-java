@@ -11,6 +11,7 @@ import javax.crypto.spec.PBEKeySpec;
 import org.bouncycastle.jce.interfaces.ECPrivateKey;
 import org.bouncycastle.jce.interfaces.ECPublicKey;
 
+import so.keyring.keycard.globalplatform.Crypto;
 import so.keyring.keycard.io.APDUCommand;
 import so.keyring.keycard.io.APDUException;
 import so.keyring.keycard.io.APDUResponse;
@@ -206,7 +207,7 @@ public class KeycardCommandSet {
     SecretKey key;
 
     try {
-      SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256", "BC");
+      SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256", Crypto.PROVIDER_NAME);
       PBEKeySpec spec = new PBEKeySpec(pairingPassword.toCharArray(), "Keycard Pairing Password Salt".getBytes(), apduChannel.pairingPasswordPBKDF2IterationCount(), 32 * 8);
       key = skf.generateSecret(spec);
     } catch (Exception e) {

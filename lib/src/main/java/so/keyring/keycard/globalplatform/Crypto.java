@@ -5,6 +5,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.Provider;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.util.Arrays;
@@ -27,14 +28,33 @@ public class Crypto {
   public static long PIN_BOUND = 999999L;
   public static long PUK_BOUND = 999999999999L;
 
+  /**
+   * Name under which Keycard registers its bundled BouncyCastle. We deliberately
+   * do NOT reuse BouncyCastleProvider.PROVIDER_NAME ("BC"): on Android the
+   * platform already owns a "BC" provider which supplies the default "BKS"
+   * KeyStore that OkHttp/TLS resolves at startup. The previous code removed that
+   * platform provider to free the "BC" name, which crashed host apps with
+   * "KeyStoreException: BKS not found" once TLS was first used. Instead we
+   * register a renamed clone and leave the platform providers untouched.
+   */
+  public static final String PROVIDER_NAME = "KeyringBC";
+
   private static boolean bouncyCastleLoaded = false;
 
-  public static void addBouncyCastleProvider() {
-    if (!bouncyCastleLoaded) {
-      Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME);
-      Security.addProvider(new BouncyCastleProvider());
+  public static synchronized void addBouncyCastleProvider() {
+    if (bouncyCastleLoaded || Security.getProvider(PROVIDER_NAME) != null) {
       bouncyCastleLoaded = true;
+      return;
     }
+
+    BouncyCastleProvider bc = new BouncyCastleProvider();
+    Provider renamed = new Provider(PROVIDER_NAME, 1.60, "Keycard BouncyCastle (" + bc.getInfo() + ")") {};
+    // BouncyCastle 1.60 registers its services as legacy string properties, so
+    // copying the provider map exposes the full algorithm set (secp256k1 ECDH/
+    // ECDSA, ISO7816-4 padding, PBKDF2-SHA512, 3DES, ...) under the new name.
+    renamed.putAll(bc);
+    Security.addProvider(renamed);
+    bouncyCastleLoaded = true;
   }
 
   /**
@@ -58,7 +78,7 @@ public class Crypto {
 
       SecretKeySpec tmpKey = new SecretKeySpec(key24, "DESede");
 
-      Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding", "BC");
+      Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding", PROVIDER_NAME);
       cipher.init(Cipher.ENCRYPT_MODE, tmpKey, new IvParameterSpec(NullBytes8));
 
       return cipher.doFinal(derivationData);
@@ -116,7 +136,7 @@ public class Crypto {
   public static byte[] mac3des(byte[] keyData, byte[] data, byte[] iv) {
     try {
       SecretKeySpec key = new SecretKeySpec(resizeKey24(keyData), "DESede");
-      Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding", "BC");
+      Cipher cipher = Cipher.getInstance("DESede/CBC/NoPadding", PROVIDER_NAME);
       cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
       byte[] result = cipher.doFinal(data, 0, 24);
       byte[] tail = new byte[8];
@@ -129,7 +149,7 @@ public class Crypto {
 
   public static byte[] ecb3des(byte[] key, byte[] data) {
     try {
-      Cipher cipher = Cipher.getInstance("DESede/ECB/NoPadding", "BC");
+      Cipher cipher = Cipher.getInstance("DESede/ECB/NoPadding", PROVIDER_NAME);
       SecretKeySpec keyDes = new SecretKeySpec(resizeKey24(key), "DES");
       cipher.init(Cipher.ENCRYPT_MODE, keyDes);
       return cipher.doFinal(data);
@@ -153,11 +173,11 @@ public class Crypto {
   public static byte[] macFull3des(byte[] keyData, byte[] data, byte[] iv) {
     try {
       SecretKeySpec keyDes = new SecretKeySpec(resizeKey8(keyData), "DES");
-      Cipher cipherDes = Cipher.getInstance("DES/CBC/NoPadding", "BC");
+      Cipher cipherDes = Cipher.getInstance("DES/CBC/NoPadding", PROVIDER_NAME);
       cipherDes.init(Cipher.ENCRYPT_MODE, keyDes, new IvParameterSpec(iv));
 
       SecretKeySpec keyDes3 = new SecretKeySpec(resizeKey24(keyData), "DESede");
-      Cipher cipherDes3 = Cipher.getInstance("DESede/CBC/NoPadding", "BC");
+      Cipher cipherDes3 = Cipher.getInstance("DESede/CBC/NoPadding", PROVIDER_NAME);
       byte[] des3Iv = iv.clone();
 
       if (data.length > 8) {
@@ -214,7 +234,7 @@ public class Crypto {
    */
   public static byte[] encryptICV(byte[] macKeyData, byte[] mac) {
     try {
-      Cipher cipher = Cipher.getInstance("DES/ECB/NoPadding", "BC");
+      Cipher cipher = Cipher.getInstance("DES/ECB/NoPadding", PROVIDER_NAME);
       SecretKeySpec key = new SecretKeySpec(resizeKey8(macKeyData), "DES");
       cipher.init(Cipher.ENCRYPT_MODE, key);
       return cipher.doFinal(mac);
